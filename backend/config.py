@@ -16,6 +16,14 @@ class Config:
     # LLM配置
     LLM_MODEL = 'deepseek-v3.2'
     
+    # Speaker Voice 配置 (CosyVoice 音色)
+    # 为不同 speaker 配置不同的 voice
+    SPEAKER_VOICES = {
+        'A': 'loongava_v2',  # Speaker A 的音色
+        'B': 'loongandy_v2',  # Speaker B 的音色
+        'default': 'loongandy_v2'  # 默认音色
+    }
+    
     # 文件路径
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_DIR = os.path.dirname(BASE_DIR)

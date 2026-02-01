@@ -188,7 +188,8 @@ def generate_full_content():
         text_preview = item['text'][:30] + '...' if len(item['text']) > 30 else item['text']
         print(f"  [{i+1}/{len(dialogue_for_tts)}] 合成 {speaker}: {text_preview}")
         
-        result = tts_service.synthesize(item['text'], voice='longxiaochun_v2' if speaker == 'A' else 'longxiaocheng_v2')
+        voice = Config.SPEAKER_VOICES.get(speaker, Config.SPEAKER_VOICES['default'])
+        result = tts_service.synthesize(item['text'], voice=voice)
         tts_results.append(result)
         
         if result.get('success'):
