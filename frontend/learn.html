@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语口语练习</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="learn-page">
+    <div class="container">
+        <header class="learn-header">
+            <h1 id="topicTitle">📚 英语学习</h1>
+            <div class="header-actions">
+                <button id="playAllBtn" class="btn btn-primary">
+                    <span class="icon">▶️</span> 播放全部
+                </button>
+                <a href="/" class="btn btn-secondary">
+                    <span class="icon">←</span> 返回配置
+                </a>
+            </div>
+        </header>
+
+        <!-- 关键词汇 -->
+        <section class="keywords-section" id="keywordsSection">
+            <h2>🎯 关键词汇</h2>
+            <div id="keywordsList" class="keywords-list"></div>
+        </section>
+
+        <!-- 对话内容 -->
+        <section class="dialogue-section">
+            <h2>💬 对话练习</h2>
+            <div class="dialogue-table">
+                <div class="dialogue-header">
+                    <div class="col chinese">中文</div>
+                    <div class="col english">英文</div>
+                    <div class="col audio">读音</div>
+                </div>
+                <div id="dialogueList" class="dialogue-body"></div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/js/learn.js"></script>
+</body>
+</html>
