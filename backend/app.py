@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 import sys
 import json
+from datetime import datetime
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -255,6 +256,69 @@ def serve_static(filename):
     """提供静态文件"""
     return send_from_directory(os.path.join(Config.PROJECT_DIR, 'static'), filename)
 
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    """获取学习历史记录列表"""
+    try:
+        history_items = []
+        if os.path.exists(Config.GENERATED_DIR):
+            for filename in os.listdir(Config.GENERATED_DIR):
+                if filename.startswith('learn_') and filename.endswith('.html'):
+                    filepath = os.path.join(Config.GENERATED_DIR, filename)
+                    stat = os.stat(filepath)
+                    # 从文件名提取主题
+                    topic = filename[6:-5].replace('_', ' ')  # 去掉 'learn_' 前缀和 '.html' 后缀
+                    history_items.append({
+                        'filename': filename,
+                        'topic': topic,
+                        'url': f'/generated/{filename}',
+                        'created_at': datetime.fromtimestamp(stat.st_ctime).strftime('%Y-%m-%d %H:%M:%S'),
+                        'size': stat.st_size
+                    })
+        # 按创建时间倒序排列
+        history_items.sort(key=lambda x: x['created_at'], reverse=True)
+        return jsonify({
+            'success': True,
+            'history': history_items,
+            'total': len(history_items)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/history/<filename>', methods=['DELETE'])
+def delete_history_item(filename):
+    """删除指定的学习历史记录"""
+    try:
+        filepath = os.path.join(Config.GENERATED_DIR, filename)
+        # 安全检查：确保文件在生成的目录中
+        if not filepath.startswith(os.path.abspath(Config.GENERATED_DIR)):
+            return jsonify({'success': False, 'error': 'Invalid filename'}), 400
+        
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return jsonify({
+                'success': True,
+                'message': f'{filename} 已删除'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '文件不存在'
+            }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/history')
+def history_page():
+    """学习历史页面"""
+    return render_template_string(HISTORY_HTML)
+
 def generate_learn_html(topic, dialogue, keywords):
     """生成学习页面HTML"""
     keywords_html = ''
@@ -498,6 +562,7 @@ INDEX_HTML = '''<!DOCTYPE html>
         
         <div id="status" class="status"></div>
         <a href="/frontend/config.html" class="link-btn">使用高级配置界面 →</a>
+        <a href="/history" class="link-btn">📚 查看学习历史</a>
     </div>
 
     <script>
@@ -583,6 +648,266 @@ INDEX_HTML = '''<!DOCTYPE html>
                 submitBtn.disabled = false;
             }
         });
+    </script>
+</body>
+</html>'''
+
+# 学习历史页面HTML
+HISTORY_HTML = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习历史 - 英语口语练习</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto;
+            background: white; 
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 10px 20px;
+            background: #f5f5f5;
+            color: #666;
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .refresh-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+        .history-item:hover {
+            background: #f0f0f0;
+            transform: translateX(5px);
+        }
+        .history-info {
+            flex: 1;
+        }
+        .history-topic {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .history-meta {
+            font-size: 13px;
+            color: #999;
+        }
+        .history-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-danger {
+            background: #ff4757;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #ff3838;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #ff4757;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 学习历史</h1>
+        <p class="subtitle">查看和管理您的学习记录</p>
+        
+        <div class="header-actions">
+            <a href="/" class="back-btn">← 返回首页</a>
+            <button class="refresh-btn" onclick="loadHistory()">🔄 刷新列表</button>
+        </div>
+        
+        <div id="historyList" class="history-list">
+            <div class="loading">⏳ 加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadHistory() {
+            const listContainer = document.getElementById('historyList');
+            listContainer.innerHTML = '<div class="loading">⏳ 加载中...</div>';
+            
+            try {
+                const response = await fetch('/api/history');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || '加载失败');
+                }
+                
+                if (data.history.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📝</div>
+                            <p>暂无学习记录</p>
+                            <p style="font-size: 14px; margin-top: 10px;">去首页生成您的第一个学习内容吧！</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                listContainer.innerHTML = data.history.map(item => `
+                    <div class="history-item" data-filename="${item.filename}">
+                        <div class="history-info">
+                            <div class="history-topic">${escapeHtml(item.topic)}</div>
+                            <div class="history-meta">
+                                📅 ${item.created_at} · 📄 ${formatSize(item.size)}
+                            </div>
+                        </div>
+                        <div class="history-actions">
+                            <a href="${item.url}" class="btn btn-primary" target="_blank">开始学习</a>
+                            <button class="btn btn-danger" onclick="deleteItem('${item.filename}', this)">删除</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+                listContainer.innerHTML = `<div class="error">❌ 加载失败: ${error.message}</div>`;
+            }
+        }
+        
+        async function deleteItem(filename, btn) {
+            if (!confirm(`确定要删除 "${filename}" 吗？`)) {
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '删除中...';
+            
+            try {
+                const response = await fetch(`/api/history/${filename}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 移除该项
+                    const item = btn.closest('.history-item');
+                    item.style.opacity = '0';
+                    item.style.transform = 'translateX(-100%)';
+                    setTimeout(() => item.remove(), 300);
+                } else {
+                    throw new Error(data.error || '删除失败');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('删除失败: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = '删除';
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        // 页面加载时自动加载历史记录
+        loadHistory();
     </script>
 </body>
 </html>'''
