@@ -359,81 +359,171 @@ def generate_learn_html(topic, dialogue, keywords):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{topic} - 英语口语练习</title>
     <style>
+        :root {{
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --primary-light: #ccfbf1;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --bg-page: #f0fdfa;
+            --bg-card: #ffffff;
+            --bg-muted: #f0fdfa;
+            --border: #cbd5e1;
+            --success: #22c55e;
+        }}
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ 
+        body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5; 
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 50%, #f0f9ff 100%);
             padding: 20px;
+            color: var(--text-primary);
+            min-height: 100vh;
         }}
-        .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-        h1 {{ text-align: center; color: #333; margin-bottom: 30px; }}
-        .keywords {{ 
-            background: #f8f9fa; 
-            padding: 20px; 
-            border-radius: 8px; 
-            margin-bottom: 30px;
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(13, 148, 136, 0.1), 0 8px 25px rgba(0,0,0,0.06);
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }}
-        .keywords h2 {{ color: #555; margin-bottom: 15px; font-size: 18px; }}
-        .keyword-list {{ display: flex; flex-wrap: wrap; gap: 10px; }}
-        .keyword-item {{ 
-            background: white; 
-            padding: 10px 15px; 
-            border-radius: 20px; 
-            border: 1px solid #e0e0e0;
+        h1 {{
+            text-align: center;
+            color: var(--text-primary);
+            margin-bottom: 32px;
+            font-size: 28px;
+            font-weight: 700;
+        }}
+        .keywords {{
+            background: var(--bg-muted);
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 32px;
+        }}
+        .keywords h2 {{
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            font-size: 16px;
+            font-weight: 600;
+        }}
+        .keyword-list {{ display: flex; flex-wrap: wrap; gap: 12px; }}
+        .keyword-item {{
+            background: var(--bg-card);
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }}
-        .keyword-item .word {{ font-weight: bold; color: #2196F3; }}
-        .keyword-item .phonetic {{ color: #999; font-size: 12px; }}
-        .keyword-item .meaning {{ color: #666; font-size: 14px; }}
-        .dialogue-table {{ width: 100%; }}
-        .dialogue-header {{ 
-            display: grid; 
-            grid-template-columns: 1fr 1fr 200px; 
-            gap: 15px; 
-            padding: 15px; 
-            background: #2196F3; 
+        .keyword-item .word {{
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 15px;
+        }}
+        .keyword-item .phonetic {{
+            color: var(--text-secondary);
+            font-size: 13px;
+        }}
+        .keyword-item .meaning {{
+            color: var(--text-secondary);
+            font-size: 14px;
+            border-left: 1px solid var(--border);
+            padding-left: 10px;
+        }}
+        .dialogue-table {{
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }}
+        .dialogue-header {{
+            display: grid;
+            grid-template-columns: 1fr 1fr 200px;
+            gap: 0;
+            padding: 16px 20px;
+            background: var(--primary);
             color: white;
-            font-weight: bold;
-            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+            font-size: 14px;
         }}
-        .dialogue-row {{ 
-            display: grid; 
-            grid-template-columns: 1fr 1fr 200px; 
-            gap: 15px; 
-            padding: 15px; 
-            border-bottom: 1px solid #eee;
+        .dialogue-row {{
+            display: grid;
+            grid-template-columns: 1fr 1fr 200px;
+            gap: 0;
+            padding: 0;
+            border-bottom: 1px solid var(--border);
+            align-items: stretch;
+        }}
+        .dialogue-row:last-child {{ border-bottom: none; }}
+        .dialogue-row:nth-child(even) {{ background: var(--bg-muted); }}
+        .col {{
+            padding: 16px 20px;
+            display: flex;
             align-items: center;
         }}
-        .dialogue-row:nth-child(even) {{ background: #f8f9fa; }}
-        .col {{ padding: 10px; }}
-        .chinese {{ color: #333; }}
-        .english {{ color: #2196F3; font-weight: 500; }}
-        .audio audio {{ width: 100%; height: 30px; }}
-        .back-btn {{ 
-            display: inline-block; 
-            margin-top: 20px; 
-            padding: 10px 20px; 
-            background: #2196F3; 
-            color: white; 
-            text-decoration: none; 
-            border-radius: 5px;
+        .col:not(:last-child) {{ border-right: 1px solid var(--border); }}
+        .chinese {{
+            color: var(--text-primary);
+            font-size: 15px;
         }}
-        .back-btn:hover {{ background: #1976D2; }}
+        .english {{
+            color: var(--primary);
+            font-weight: 500;
+            font-size: 15px;
+        }}
+        .audio {{
+            justify-content: center;
+        }}
+        .audio audio {{
+            width: 100%;
+            height: 36px;
+        }}
+        .back-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding: 12px 24px;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s;
+        }}
+        .back-btn:hover {{
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }}
+        @media (max-width: 768px) {{
+            .container {{ padding: 20px; }}
+            .dialogue-header,
+            .dialogue-row {{
+                grid-template-columns: 1fr;
+            }}
+            .col:not(:last-child) {{
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }}
+        }}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📚 {topic}</h1>
-        
+
         <div class="keywords">
             <h2>🎯 关键词汇</h2>
             <div class="keyword-list">
                 {keywords_html}
             </div>
         </div>
-        
+
         <div class="dialogue-table">
             <div class="dialogue-header">
                 <div>中文</div>
@@ -442,8 +532,8 @@ def generate_learn_html(topic, dialogue, keywords):
             </div>
             {dialogue_html}
         </div>
-        
-        <a href="/" class="back-btn">← 返回配置</a>
+
+        <a href="/" class="back-btn">← 返回首页</a>
     </div>
 </body>
 </html>'''
@@ -456,96 +546,204 @@ INDEX_HTML = '''<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>英语口语练习 - 配置</title>
     <style>
+        :root {
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --primary-light: #ccfbf1;
+            --primary-soft: #5eead4;
+            --success: #22c55e;
+            --success-light: #dcfce7;
+            --error: #ef4444;
+            --error-light: #fee2e2;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --bg-page: #f0fdfa;
+            --bg-card: #ffffff;
+            --border: #cbd5e1;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
+        body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 50%, #f0f9ff 100%);
             min-height: 100vh;
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
         }
-        .container { 
-            max-width: 600px; 
+        /* 背景装饰元素 */
+        .bg-decoration {
+            position: fixed;
+            border-radius: 50%;
+            opacity: 0.6;
+            filter: blur(40px);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .bg-decoration-1 {
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(135deg, #5eead4 0%, #0d9488 100%);
+            top: -100px;
+            right: -100px;
+            animation: float 8s ease-in-out infinite;
+        }
+        .bg-decoration-2 {
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, #a5f3fc 0%, #22d3ee 100%);
+            bottom: 10%;
+            left: -50px;
+            animation: float 10s ease-in-out infinite reverse;
+        }
+        .bg-decoration-3 {
+            width: 150px;
+            height: 150px;
+            background: linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 100%);
+            top: 40%;
+            right: 5%;
+            animation: float 12s ease-in-out infinite;
+        }
+        .bg-decoration-4 {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%);
+            bottom: 20%;
+            right: 10%;
+            animation: float 6s ease-in-out infinite reverse;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(5deg); }
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 48px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(13, 148, 136, 0.15), 0 8px 25px rgba(0,0,0,0.08);
             width: 100%;
-            background: white; 
-            padding: 40px; 
-            border-radius: 20px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 480px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
         }
-        h1 { 
-            text-align: center; 
-            color: #333; 
-            margin-bottom: 10px;
-            font-size: 28px;
+        h1 {
+            text-align: center;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-size: 32px;
+            font-weight: 700;
         }
         .subtitle {
             text-align: center;
-            color: #666;
-            margin-bottom: 30px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-size: 15px;
         }
-        .form-group { margin-bottom: 20px; }
-        label { 
-            display: block; 
-            margin-bottom: 8px; 
-            color: #555; 
+        .form-group { margin-bottom: 24px; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
             font-weight: 500;
+            font-size: 14px;
         }
         input[type="text"], input[type="password"], input[type="number"] {
             width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.2s;
+            background: var(--bg-card);
+            color: var(--text-primary);
         }
         input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        input::placeholder {
+            color: #9ca3af;
         }
         .btn {
             width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 14px 24px;
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: bold;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.2s;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        .btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.3);
         }
         .btn:disabled {
-            background: #ccc;
+            background: #d1d5db;
             cursor: not-allowed;
-            transform: none;
         }
         .status {
             margin-top: 20px;
-            padding: 15px;
+            padding: 12px 16px;
             border-radius: 10px;
             text-align: center;
             display: none;
+            font-size: 14px;
+            font-weight: 500;
         }
-        .status.success { background: #d4edda; color: #155724; display: block; }
-        .status.error { background: #f8d7da; color: #721c24; display: block; }
-        .status.loading { background: #fff3cd; color: #856404; display: block; }
+        .status.success {
+            background: var(--success-light);
+            color: #065f46;
+            display: block;
+            border: 1px solid #a7f3d0;
+        }
+        .status.error {
+            background: var(--error-light);
+            color: #991b1b;
+            display: block;
+            border: 1px solid #fecaca;
+        }
+        .status.loading {
+            background: var(--warning-light);
+            color: #92400e;
+            display: block;
+            border: 1px solid #fde68a;
+        }
         .link-btn {
             display: block;
             text-align: center;
-            margin-top: 15px;
-            color: #667eea;
+            margin-top: 20px;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 12px;
+            border-radius: 10px;
+            transition: all 0.2s;
+        }
+        .link-btn:hover {
+            background: var(--primary-light);
             text-decoration: none;
         }
-        .link-btn:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
+    <!-- 背景装饰元素 -->
+    <div class="bg-decoration bg-decoration-1"></div>
+    <div class="bg-decoration bg-decoration-2"></div>
+    <div class="bg-decoration bg-decoration-3"></div>
+    <div class="bg-decoration bg-decoration-4"></div>
+    
     <div class="container">
         <h1>🎓 英语口语练习</h1>
         <p class="subtitle">配置学习参数，生成专属对话内容</p>
@@ -678,151 +876,222 @@ HISTORY_HTML = '''<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>学习历史 - 英语口语练习</title>
     <style>
+        :root {
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --primary-light: #ccfbf1;
+            --primary-soft: #5eead4;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --bg-page: #f0fdfa;
+            --bg-card: #ffffff;
+            --bg-muted: #f0fdfa;
+            --border: #cbd5e1;
+            --error: #ef4444;
+            --error-light: #fee2e2;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
+        body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 50%, #f0f9ff 100%);
             min-height: 100vh;
             padding: 20px;
+            color: var(--text-primary);
+            position: relative;
+            overflow-x: hidden;
         }
-        .container { 
-            max-width: 900px; 
+        /* 背景装饰元素 */
+        .bg-decoration {
+            position: fixed;
+            border-radius: 50%;
+            opacity: 0.5;
+            filter: blur(50px);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .bg-decoration-1 {
+            width: 250px;
+            height: 250px;
+            background: linear-gradient(135deg, #5eead4 0%, #0d9488 100%);
+            top: -80px;
+            left: -80px;
+            animation: float 9s ease-in-out infinite;
+        }
+        .bg-decoration-2 {
+            width: 180px;
+            height: 180px;
+            background: linear-gradient(135deg, #a5f3fc 0%, #22d3ee 100%);
+            bottom: 15%;
+            right: -40px;
+            animation: float 11s ease-in-out infinite reverse;
+        }
+        .bg-decoration-3 {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 100%);
+            top: 30%;
+            left: 5%;
+            animation: float 7s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(3deg); }
+        }
+        .container {
+            max-width: 900px;
             margin: 0 auto;
-            background: white; 
-            padding: 40px; 
-            border-radius: 20px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(13, 148, 136, 0.12), 0 8px 25px rgba(0,0,0,0.06);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
         }
-        h1 { 
-            text-align: center; 
-            color: #333; 
-            margin-bottom: 10px;
+        h1 {
+            text-align: center;
+            color: var(--text-primary);
+            margin-bottom: 8px;
             font-size: 28px;
+            font-weight: 700;
         }
         .subtitle {
             text-align: center;
-            color: #666;
-            margin-bottom: 30px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
         }
         .header-actions {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #f0f0f0;
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
         }
         .back-btn {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
             padding: 10px 20px;
-            background: #f5f5f5;
-            color: #666;
+            background: var(--bg-muted);
+            color: var(--text-secondary);
             text-decoration: none;
             border-radius: 10px;
-            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
         .back-btn:hover {
-            background: #e0e0e0;
-            color: #333;
+            background: var(--border);
+            color: var(--text-primary);
         }
         .refresh-btn {
             padding: 10px 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--primary);
             color: white;
             border: none;
             border-radius: 10px;
             cursor: pointer;
             font-size: 14px;
-            transition: all 0.3s;
+            font-weight: 500;
+            transition: all 0.2s;
         }
         .refresh-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
         .history-list {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
         }
         .history-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 20px;
-            background: #f8f9fa;
+            background: var(--bg-muted);
             border-radius: 12px;
-            border: 1px solid #e0e0e0;
-            transition: all 0.3s;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
         }
         .history-item:hover {
-            background: #f0f0f0;
-            transform: translateX(5px);
+            background: var(--bg-card);
+            border-color: var(--primary-light);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
         }
         .history-info {
             flex: 1;
         }
         .history-topic {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
-            color: #333;
-            margin-bottom: 5px;
+            color: var(--text-primary);
+            margin-bottom: 6px;
         }
         .history-meta {
             font-size: 13px;
-            color: #999;
+            color: var(--text-secondary);
         }
         .history-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
         .btn {
             padding: 8px 16px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
+            font-weight: 500;
             text-decoration: none;
-            transition: all 0.3s;
+            transition: all 0.2s;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--primary);
             color: white;
         }
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            background: var(--primary-dark);
+            box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
         }
         .btn-danger {
-            background: #ff4757;
-            color: white;
+            background: transparent;
+            color: var(--error);
+            border: 1px solid var(--error);
         }
         .btn-danger:hover {
-            background: #ff3838;
+            background: var(--error-light);
         }
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #999;
+            color: var(--text-secondary);
         }
         .empty-state .icon {
             font-size: 48px;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
         .loading {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: var(--text-secondary);
         }
         .error {
             text-align: center;
             padding: 40px;
-            color: #ff4757;
+            color: var(--error);
         }
     </style>
 </head>
 <body>
+    <!-- 背景装饰元素 -->
+    <div class="bg-decoration bg-decoration-1"></div>
+    <div class="bg-decoration bg-decoration-2"></div>
+    <div class="bg-decoration bg-decoration-3"></div>
+    
     <div class="container">
         <h1>📚 学习历史</h1>
         <p class="subtitle">查看和管理您的学习记录</p>
