@@ -569,7 +569,6 @@ INDEX_HTML = '''<!DOCTYPE html>
         </form>
         
         <div id="status" class="status"></div>
-        <a href="/frontend/config.html" class="link-btn">使用高级配置界面 →</a>
         <a href="/history" class="link-btn">📚 查看学习历史</a>
     </div>
 
