@@ -156,25 +156,59 @@ def generate_full_content():
     if not topic:
         return jsonify({'success': False, 'error': 'Topic is required'}), 400
     
+    print(f"\n{'='*60}")
+    print(f"🚀 开始生成学习内容")
+    print(f"{'='*60}")
+    print(f"📌 话题: {topic}")
+    print(f"📌 轮数: {num_exchanges}")
+    print(f"{'='*60}\n")
+    
     # 1. 生成对话
+    print("[1/3] ⏳ 正在生成对话内容...")
     dialogue_result = llm_service.generate_dialogue(topic, num_exchanges)
     if not dialogue_result.get('success'):
+        print(f"❌ 对话生成失败: {dialogue_result.get('error')}")
         return jsonify(dialogue_result)
     
     dialogue = dialogue_result.get('dialogue', [])
     keywords = dialogue_result.get('keywords', [])
+    print(f"✅ 对话生成完成 ({len(dialogue)} 轮对话, {len(keywords)} 个关键词)")
     
     # 2. 为对话生成语音
+    print(f"\n[2/3] ⏳ 正在生成语音 ({len(dialogue)} 段)...")
     dialogue_for_tts = [
         {'text': item.get('english', ''), 'speaker': item.get('speaker', 'A')}
         for item in dialogue
     ]
-    tts_results = tts_service.synthesize_dialogue(dialogue_for_tts)
+    
+    tts_results = []
+    success_count = 0
+    for i, item in enumerate(dialogue_for_tts):
+        speaker = item['speaker']
+        text_preview = item['text'][:30] + '...' if len(item['text']) > 30 else item['text']
+        print(f"  [{i+1}/{len(dialogue_for_tts)}] 合成 {speaker}: {text_preview}")
+        
+        result = tts_service.synthesize(item['text'], voice='longxiaochun_v2' if speaker == 'A' else 'longxiaocheng_v2')
+        tts_results.append(result)
+        
+        if result.get('success'):
+            success_count += 1
+            print(f"       ✅ 完成 ({result.get('first_package_delay_ms', 0):.0f}ms)")
+        else:
+            print(f"       ❌ 失败: {result.get('error', '未知错误')}")
+    
+    print(f"\n✅ 语音生成完成 ({success_count}/{len(dialogue)} 成功)")
     
     # 3. 合并结果
+    print(f"\n[3/3] ⏳ 正在合并结果...")
     for i, item in enumerate(dialogue):
         if i < len(tts_results) and tts_results[i].get('success'):
             item['audio_url'] = tts_results[i].get('url')
+    print("✅ 结果合并完成")
+    
+    print(f"\n{'='*60}")
+    print(f"🎉 学习内容生成完成!")
+    print(f"{'='*60}\n")
     
     return jsonify({
         'success': True,
