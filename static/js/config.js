@@ -4,10 +4,10 @@
 
 // 全局状态
 let currentData = null;
+let apiConfigured = false;
 
 // DOM元素
 const elements = {
-    apiKey: document.getElementById('apiKey'),
     topic: document.getElementById('topic'),
     exchanges: document.getElementById('exchanges'),
     voice: document.getElementById('voice'),
@@ -17,13 +17,14 @@ const elements = {
     status: document.getElementById('status'),
     previewContent: document.getElementById('previewContent'),
     keywordsPanel: document.getElementById('keywordsPanel'),
-    keywordsList: document.getElementById('keywordsList')
+    keywordsList: document.getElementById('keywordsList'),
+    apiStatus: document.getElementById('apiStatus')
 };
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
-    loadSavedConfig();
+    checkApiConfig();
 });
 
 // 绑定事件
@@ -33,17 +34,32 @@ function bindEvents() {
     elements.saveBtn.addEventListener('click', handleSave);
 }
 
-// 加载保存的配置
-function loadSavedConfig() {
-    const savedApiKey = localStorage.getItem('dashscope_api_key');
-    if (savedApiKey) {
-        elements.apiKey.value = savedApiKey;
-    }
-}
+// 检查API配置
+async function checkApiConfig() {
+    try {
+        const res = await fetch('/api/config');
+        const data = await res.json();
 
-// 保存配置到本地
-function saveConfig() {
-    localStorage.setItem('dashscope_api_key', elements.apiKey.value);
+        if (data.success && data.services_ready) {
+            apiConfigured = true;
+            elements.apiStatus.innerHTML = '✅ API 已配置，服务就绪';
+            elements.apiStatus.style.background = '#d4edda';
+            elements.apiStatus.style.color = '#155724';
+            elements.generateBtn.disabled = false;
+        } else {
+            apiConfigured = false;
+            elements.apiStatus.innerHTML = '❌ ' + data.message;
+            elements.apiStatus.style.background = '#f8d7da';
+            elements.apiStatus.style.color = '#721c24';
+            elements.generateBtn.disabled = true;
+        }
+    } catch (error) {
+        apiConfigured = false;
+        elements.apiStatus.innerHTML = '❌ 无法连接到服务器';
+        elements.apiStatus.style.background = '#f8d7da';
+        elements.apiStatus.style.color = '#721c24';
+        elements.generateBtn.disabled = true;
+    }
 }
 
 // 显示状态
@@ -67,12 +83,11 @@ function setButtonsState(generating) {
 
 // 生成内容
 async function handleGenerate() {
-    const apiKey = elements.apiKey.value.trim();
     const topic = elements.topic.value.trim();
     const numExchanges = parseInt(elements.exchanges.value);
 
-    if (!apiKey) {
-        showStatus('❌ 请输入API Key', 'error');
+    if (!apiConfigured) {
+        showStatus('❌ API 未配置，请在 .env 文件中设置 DASHSCOPE_API_KEY', 'error');
         return;
     }
     if (!topic) {
@@ -80,23 +95,11 @@ async function handleGenerate() {
         return;
     }
 
-    saveConfig();
     setButtonsState(true);
     showStatus('⏳ 正在生成内容，请稍候...', 'loading');
 
     try {
-        // 1. 配置API
-        const configRes = await fetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey })
-        });
-
-        if (!configRes.ok) {
-            throw new Error('API配置失败');
-        }
-
-        // 2. 生成完整内容
+        // 生成完整内容
         const generateRes = await fetch('/api/generate-full', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -170,13 +173,13 @@ function renderKeywords(keywords) {
 // 预览（在新窗口打开）
 function handlePreview() {
     if (!currentData) return;
-    
+
     const params = new URLSearchParams({
         topic: currentData.topic,
         dialogue: JSON.stringify(currentData.dialogue),
         keywords: JSON.stringify(currentData.keywords)
     });
-    
+
     window.open(`/frontend/learn.html?${params.toString()}`, '_blank');
 }
 

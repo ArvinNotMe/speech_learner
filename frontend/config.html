@@ -20,11 +20,10 @@
                 
                 <div class="form-section">
                     <h3>API 设置</h3>
-                    <div class="form-group">
-                        <label for="apiKey">阿里云 DashScope API Key</label>
-                        <input type="password" id="apiKey" placeholder="请输入您的API Key">
-                        <span class="hint">从 <a href="https://dashscope.aliyun.com/" target="_blank">阿里云DashScope</a> 获取</span>
+                    <div id="apiStatus" class="status-info" style="padding: 10px; background: #f5f5f5; border-radius: 5px; margin-bottom: 15px;">
+                        ⏳ 正在检查 API 配置...
                     </div>
+                    <p class="hint">API Key 已从 .env 文件加载，如需修改请编辑后端 .env 文件</p>
                 </div>
 
                 <div class="form-section">

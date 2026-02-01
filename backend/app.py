@@ -18,9 +18,29 @@ CORS(app)
 
 Config.init_app(app)
 
-# 全局服务实例
+# 全局服务实例 - 从环境变量自动初始化
 tts_service = None
 llm_service = None
+
+def init_services():
+    """从环境变量初始化服务"""
+    global tts_service, llm_service
+    api_key = Config.DASHSCOPE_API_KEY
+    if api_key:
+        try:
+            tts_service = TTSService(api_key=api_key)
+            llm_service = LLMService(api_key=api_key)
+            print(f"✅ 服务初始化成功 (API Key: {api_key[:8]}...)")
+            return True
+        except Exception as e:
+            print(f"❌ 服务初始化失败: {e}")
+            return False
+    else:
+        print("⚠️ 未配置 DASHSCOPE_API_KEY，请在 .env 文件中设置")
+        return False
+
+# 应用启动时自动初始化
+init_services()
 
 @app.route('/')
 def index():
@@ -30,29 +50,18 @@ def index():
 def health_check():
     return jsonify({'status': 'ok'})
 
-@app.route('/api/config', methods=['POST'])
-def set_config():
-    """设置API配置"""
-    global tts_service, llm_service
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """获取当前配置状态"""
+    api_key_configured = bool(Config.DASHSCOPE_API_KEY)
+    services_ready = tts_service is not None and llm_service is not None
     
-    data = request.get_json()
-    api_key = data.get('api_key', '')
-    
-    if not api_key:
-        return jsonify({'success': False, 'error': 'API key is required'}), 400
-    
-    try:
-        tts_service = TTSService(api_key=api_key)
-        llm_service = LLMService(api_key=api_key)
-        return jsonify({
-            'success': True,
-            'message': 'Configuration updated successfully'
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+    return jsonify({
+        'success': True,
+        'api_key_configured': api_key_configured,
+        'services_ready': services_ready,
+        'message': '服务已就绪' if services_ready else '请在 .env 文件中配置 DASHSCOPE_API_KEY'
+    })
 
 @app.route('/api/dialogue/generate', methods=['POST'])
 def generate_dialogue():
@@ -541,12 +550,11 @@ INDEX_HTML = '''<!DOCTYPE html>
         <h1>🎓 英语口语练习</h1>
         <p class="subtitle">配置学习参数，生成专属对话内容</p>
         
+        <div id="configStatus" class="status" style="display: block; margin-bottom: 20px;">
+            ⏳ 正在检查配置...
+        </div>
+        
         <form id="configForm">
-            <div class="form-group">
-                <label for="apiKey">阿里云 DashScope API Key</label>
-                <input type="password" id="apiKey" placeholder="请输入您的API Key" required>
-            </div>
-            
             <div class="form-group">
                 <label for="topic">学习话题</label>
                 <input type="text" id="topic" placeholder="例如：餐厅点餐、机场登机、酒店入住..." required>
@@ -557,7 +565,7 @@ INDEX_HTML = '''<!DOCTYPE html>
                 <input type="number" id="exchanges" value="5" min="3" max="10">
             </div>
             
-            <button type="submit" class="btn" id="submitBtn">🚀 生成学习内容</button>
+            <button type="submit" class="btn" id="submitBtn" disabled>🚀 生成学习内容</button>
         </form>
         
         <div id="status" class="status"></div>
@@ -566,10 +574,35 @@ INDEX_HTML = '''<!DOCTYPE html>
     </div>
 
     <script>
+        // 页面加载时检查配置
+        async function checkConfig() {
+            const configStatus = document.getElementById('configStatus');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                
+                if (data.success && data.services_ready) {
+                    configStatus.className = 'status success';
+                    configStatus.innerHTML = '✅ ' + data.message;
+                    submitBtn.disabled = false;
+                } else {
+                    configStatus.className = 'status error';
+                    configStatus.innerHTML = '❌ ' + data.message + '<br><small>请在 .env 文件中配置 DASHSCOPE_API_KEY</small>';
+                }
+            } catch (error) {
+                configStatus.className = 'status error';
+                configStatus.textContent = '❌ 无法连接到服务器';
+            }
+        }
+        
+        // 页面加载时检查配置
+        checkConfig();
+        
         document.getElementById('configForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const apiKey = document.getElementById('apiKey').value;
             const topic = document.getElementById('topic').value;
             const exchanges = document.getElementById('exchanges').value;
             const statusDiv = document.getElementById('status');
@@ -580,22 +613,8 @@ INDEX_HTML = '''<!DOCTYPE html>
             statusDiv.textContent = '⏳ 正在生成内容，请稍候...';
             
             try {
-                // 1. 配置API
-                console.log('Step 1: 配置API...');
-                const configRes = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ api_key: apiKey })
-                });
-                
-                if (!configRes.ok) {
-                    const errorData = await configRes.json().catch(() => ({}));
-                    throw new Error(errorData.error || `API配置失败: ${configRes.status}`);
-                }
-                console.log('Step 1: API配置成功');
-                
-                // 2. 生成完整内容
-                console.log('Step 2: 生成对话内容...');
+                // 1. 生成完整内容
+                console.log('Step 1: 生成对话内容...');
                 const generateRes = await fetch('/api/generate-full', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -608,14 +627,14 @@ INDEX_HTML = '''<!DOCTYPE html>
                 }
                 
                 const data = await generateRes.json();
-                console.log('Step 2: 生成结果:', data);
+                console.log('Step 1: 生成结果:', data);
                 
                 if (!data.success) {
                     throw new Error(data.error || '生成失败');
                 }
                 
-                // 3. 保存HTML
-                console.log('Step 3: 保存HTML...');
+                // 2. 保存HTML
+                console.log('Step 2: 保存HTML...');
                 const saveRes = await fetch('/api/save-html', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -632,7 +651,7 @@ INDEX_HTML = '''<!DOCTYPE html>
                 }
                 
                 const saveData = await saveRes.json();
-                console.log('Step 3: 保存结果:', saveData);
+                console.log('Step 2: 保存结果:', saveData);
                 
                 if (saveData.success) {
                     statusDiv.className = 'status success';
