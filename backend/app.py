@@ -3,6 +3,9 @@ from flask_cors import CORS
 import os
 import sys
 import json
+import uuid
+import threading
+import time
 from datetime import datetime
 
 # 添加项目根目录到路径
@@ -14,13 +17,47 @@ from backend.services.llm_service import LLMService
 
 app = Flask(__name__)
 app.config.from_object(Config)
-CORS(app)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 Config.init_app(app)
 
 # 全局服务实例 - 从环境变量自动初始化
 tts_service = None
 llm_service = None
+
+# 任务状态存储（简单内存存储，生产环境建议使用 Redis）
+task_status = {}
+task_status_lock = threading.Lock()
+
+def update_task_status(task_id, status, progress=None, result=None, error=None):
+    """更新任务状态"""
+    with task_status_lock:
+        task_status[task_id] = {
+            'status': status,  # 'pending', 'running', 'completed', 'failed'
+            'progress': progress or 0,
+            'result': result,
+            'error': error,
+            'updated_at': datetime.now().isoformat()
+        }
+
+def cleanup_old_tasks():
+    """清理超过1小时的旧任务"""
+    with task_status_lock:
+        current_time = datetime.now()
+        to_remove = []
+        for task_id, task in task_status.items():
+            updated_at = datetime.fromisoformat(task['updated_at'])
+            if (current_time - updated_at).total_seconds() > 3600:
+                to_remove.append(task_id)
+        for task_id in to_remove:
+            del task_status[task_id]
 
 def init_services():
     """从环境变量初始化服务"""
@@ -49,6 +86,13 @@ def index():
 @app.route('/api/health')
 def health_check():
     return jsonify({'status': 'ok'})
+
+@app.route('/api/test-long-request')
+def test_long_request():
+    """测试长请求是否正常"""
+    import time
+    time.sleep(5)  # 模拟5秒延迟
+    return jsonify({'status': 'ok', 'message': '长请求测试成功'})
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
@@ -215,17 +259,149 @@ def generate_full_content():
     for i, item in enumerate(dialogue):
         if i < len(tts_results) and tts_results[i].get('success'):
             item['audio_url'] = tts_results[i].get('url')
+        # 清理可能存在的不可序列化数据
+        item.pop('phonetic', None)
     print("✅ 结果合并完成")
     
     print(f"\n{'='*60}")
     print(f"🎉 学习内容生成完成!")
     print(f"{'='*60}\n")
     
-    return jsonify({
+    # 确保数据可以序列化为 JSON
+    import json
+    response_data = {
         'success': True,
         'topic': topic,
         'dialogue': dialogue,
         'keywords': keywords
+    }
+    
+    # 验证 JSON 序列化
+    try:
+        json_str = json.dumps(response_data, ensure_ascii=False)
+        print(f"📤 返回数据大小: {len(json_str)} bytes")
+    except Exception as e:
+        print(f"❌ JSON 序列化失败: {e}")
+        return jsonify({'success': False, 'error': '数据序列化失败'}), 500
+    
+    # 直接返回 jsonify，让 Flask 处理
+    print("📤 正在返回响应...")
+    return jsonify(response_data)
+
+def generate_content_async(task_id, topic, num_exchanges):
+    """异步生成学习内容"""
+    global tts_service, llm_service
+    
+    try:
+        update_task_status(task_id, 'running', progress=10)
+        
+        # 1. 生成对话
+        print(f"[Task {task_id}] 生成对话...")
+        dialogue_result = llm_service.generate_dialogue(topic, num_exchanges)
+        if not dialogue_result.get('success'):
+            update_task_status(task_id, 'failed', error=dialogue_result.get('error'))
+            return
+        
+        dialogue = dialogue_result.get('dialogue', [])
+        keywords = dialogue_result.get('keywords', [])
+        update_task_status(task_id, 'running', progress=40)
+        
+        # 2. 生成语音
+        print(f"[Task {task_id}] 生成语音...")
+        dialogue_for_tts = [
+            {'text': item.get('english', ''), 'speaker': item.get('speaker', 'A')}
+            for item in dialogue
+        ]
+        
+        tts_results = []
+        for i, item in enumerate(dialogue_for_tts):
+            voice = Config.SPEAKER_VOICES.get(item['speaker'], Config.SPEAKER_VOICES['default'])
+            result = tts_service.synthesize(item['text'], voice=voice)
+            tts_results.append(result)
+            progress = 40 + int((i + 1) / len(dialogue_for_tts) * 40)
+            update_task_status(task_id, 'running', progress=progress)
+        
+        # 3. 合并结果
+        print(f"[Task {task_id}] 合并结果...")
+        for i, item in enumerate(dialogue):
+            if i < len(tts_results) and tts_results[i].get('success'):
+                item['audio_url'] = tts_results[i].get('url')
+            item.pop('phonetic', None)
+        
+        # 4. 保存HTML
+        html_content = generate_learn_html(topic, dialogue, keywords)
+        filename = f"learn_{topic.replace(' ', '_').replace('/', '_')}.html"
+        filepath = os.path.join(Config.GENERATED_DIR, filename)
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        update_task_status(task_id, 'completed', progress=100, result={
+            'topic': topic,
+            'dialogue': dialogue,
+            'keywords': keywords,
+            'filename': filename,
+            'url': f'/generated/{filename}'
+        })
+        print(f"[Task {task_id}] 完成!")
+        
+    except Exception as e:
+        print(f"[Task {task_id}] 错误: {e}")
+        update_task_status(task_id, 'failed', error=str(e))
+
+@app.route('/api/generate-async', methods=['POST'])
+def generate_async():
+    """启动异步生成任务"""
+    global llm_service, tts_service
+    
+    if llm_service is None or tts_service is None:
+        return jsonify({
+            'success': False,
+            'error': 'Services not initialized'
+        }), 400
+    
+    data = request.get_json()
+    topic = data.get('topic', '')
+    num_exchanges = data.get('num_exchanges', 5)
+    
+    if not topic:
+        return jsonify({'success': False, 'error': 'Topic is required'}), 400
+    
+    # 生成任务ID
+    task_id = str(uuid.uuid4())
+    
+    # 初始化任务状态
+    update_task_status(task_id, 'pending', progress=0)
+    
+    # 启动后台线程
+    thread = threading.Thread(
+        target=generate_content_async,
+        args=(task_id, topic, num_exchanges)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        'success': True,
+        'task_id': task_id,
+        'message': '任务已启动'
+    })
+
+@app.route('/api/task/<task_id>', methods=['GET'])
+def get_task_status(task_id):
+    """获取任务状态"""
+    with task_status_lock:
+        task = task_status.get(task_id)
+    
+    if not task:
+        return jsonify({
+            'success': False,
+            'error': 'Task not found'
+        }), 404
+    
+    return jsonify({
+        'success': True,
+        'task': task
     })
 
 @app.route('/api/save-html', methods=['POST'])
@@ -807,59 +983,69 @@ INDEX_HTML = '''<!DOCTYPE html>
             
             submitBtn.disabled = true;
             statusDiv.className = 'status loading';
-            statusDiv.textContent = '⏳ 正在生成内容，请稍候...';
+            statusDiv.textContent = '⏳ 正在启动生成任务...';
             
             try {
-                // 1. 生成完整内容
-                console.log('Step 1: 生成对话内容...');
-                const generateRes = await fetch('/api/generate-full', {
+                // 1. 启动异步生成任务
+                console.log('Step 1: 启动异步任务, topic:', topic);
+                const startRes = await fetch('/api/generate-async', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic, num_exchanges: parseInt(exchanges) })
+                    body: JSON.stringify({ topic: topic, num_exchanges: parseInt(exchanges) })
                 });
                 
-                if (!generateRes.ok) {
-                    const errorData = await generateRes.json().catch(() => ({}));
-                    throw new Error(errorData.error || `生成失败: ${generateRes.status}`);
+                if (!startRes.ok) {
+                    throw new Error('启动任务失败');
                 }
                 
-                const data = await generateRes.json();
-                console.log('Step 1: 生成结果:', data);
-                
-                if (!data.success) {
-                    throw new Error(data.error || '生成失败');
+                const startData = await startRes.json();
+                if (!startData.success) {
+                    throw new Error(startData.error || '启动任务失败');
                 }
                 
-                // 2. 保存HTML
-                console.log('Step 2: 保存HTML...');
-                const saveRes = await fetch('/api/save-html', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        topic: data.topic,
-                        dialogue: data.dialogue,
-                        keywords: data.keywords
-                    })
-                });
+                const taskId = startData.task_id;
+                console.log('任务已启动:', taskId);
                 
-                if (!saveRes.ok) {
-                    const errorData = await saveRes.json().catch(() => ({}));
-                    throw new Error(errorData.error || `保存失败: ${saveRes.status}`);
+                // 2. 轮询任务状态
+                statusDiv.textContent = '⏳ 正在生成内容，请稍候...';
+                
+                let completed = false;
+                let attempts = 0;
+                const maxAttempts = 120; // 最多轮询120次（2分钟）
+                
+                while (!completed && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // 每秒查询一次
+                    attempts++;
+                    
+                    const statusRes = await fetch(`/api/task/${taskId}`);
+                    if (!statusRes.ok) continue;
+                    
+                    const statusData = await statusRes.json();
+                    if (!statusData.success) continue;
+                    
+                    const task = statusData.task;
+                    console.log(`任务状态: ${task.status}, 进度: ${task.progress}%`);
+                    
+                    if (task.status === 'running') {
+                        statusDiv.textContent = `⏳ 正在生成内容... (${task.progress}%)`;
+                    } else if (task.status === 'completed') {
+                        completed = true;
+                        const result = task.result;
+                        statusDiv.className = 'status success';
+                        statusDiv.innerHTML = `✅ 生成成功！<br><a href="${result.url}" target="_blank">点击打开学习页面</a>`;
+                    } else if (task.status === 'failed') {
+                        throw new Error(task.error || '生成失败');
+                    }
                 }
                 
-                const saveData = await saveRes.json();
-                console.log('Step 2: 保存结果:', saveData);
-                
-                if (saveData.success) {
-                    statusDiv.className = 'status success';
-                    statusDiv.innerHTML = `✅ 生成成功！<br><a href="${saveData.url}" target="_blank">点击打开学习页面</a>`;
-                } else {
-                    throw new Error(saveData.error || '保存失败');
+                if (!completed) {
+                    throw new Error('生成超时，请稍后重试');
                 }
             } catch (error) {
                 console.error('Error:', error);
                 statusDiv.className = 'status error';
-                statusDiv.innerHTML = '❌ ' + error.message + '<br><small>请查看浏览器控制台获取详细信息</small>';
+                let errorMsg = error.message;
+                statusDiv.innerHTML = '❌ ' + errorMsg + '<br><small>请查看浏览器控制台(F12)获取详细信息</small>';
             } finally {
                 submitBtn.disabled = false;
             }

@@ -13,7 +13,8 @@ def start_server(port=5000):
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from backend.app import app
     print(f"🚀 启动服务器... (端口: {port})")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # 使用多线程模式，避免长请求阻塞其他请求
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
 
 def open_browser(port=5000):
     """自动打开浏览器"""
