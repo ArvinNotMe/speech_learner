@@ -97,6 +97,33 @@ speech_learner/
    - 点击"查看学习历史"
    - 管理已生成的学习内容
 
+## 📦 打包
+
+使用 PyInstaller 将应用打包为可执行文件：
+
+### 1. 安装 PyInstaller
+
+```bash
+pip install pyinstaller
+```
+
+### 2. 执行打包
+
+```bash
+python build_exe.py
+```
+
+### 3. 运行打包后的程序
+
+打包完成后，可执行文件位于 `release/speech_learner.exe`：
+
+```bash
+cd release
+speech_learner.exe
+```
+
+> 首次运行时，程序会自动创建 `.env` 文件，请配置 API Key 后重新运行
+
 ## 🧪 测试
 
 运行单元测试：
